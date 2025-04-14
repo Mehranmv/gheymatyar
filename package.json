@@ -1,0 +1,14 @@
+{
+  "name": "prices",
+  "version": "1.0.0",
+  "description": "My prices app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "^35.1.5",
+    "electron-builder": "^26.0.12"
+  }
+}
