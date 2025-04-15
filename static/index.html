@@ -4,15 +4,12 @@
 <head>
   <meta charset="UTF-8" />
   <title>قیمت ارز و طلا</title>
-  <link rel="icon" href="https://example.com/icon.ico" type="image/x-icon" />
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://cdn.fontcdn.ir/Font/Persian/Vazir/Vazir.css" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       font-family: Vazir, sans-serif;
-      background-image: url('https://example.com/background.jpg');
-      background-size: cover;
-      background-position: center;
     }
 
     .price {
@@ -31,25 +28,30 @@
     }
 
     .price-container {
-      background-color: rgba(255, 255, 255, 0.9);
+      background-color: rgba(255, 255, 255, 0.95);
       border-radius: 8px;
       padding: 15px;
     }
   </style>
 </head>
 
-<body class="p-8 text-gray-800">
+<body class="p-8 text-gray-800 bg-gray-100">
 
-  <div class="max-w-xl mx-auto bg-white rounded-lg shadow-lg p-6 space-y-4 price-container">
+  <div class="max-w-3xl mx-auto bg-white rounded-lg shadow-lg p-6 space-y-6 price-container">
     <h1 class="text-2xl font-bold text-center">قیمت لحظه‌ای</h1>
 
-    <div class="space-y-2 text-right" id="prices">
-      <div class="p-3 bg-blue-100 rounded price">دلار: <span id="usd">در حال بارگذاری...</span></div>
-      <div class="p-3 bg-green-100 rounded price">مثقال طلا: <span id="gold">در حال بارگذاری...</span></div>
-      <div class="p-3 bg-yellow-100 rounded price">سکه: <span id="coin">در حال بارگذاری...</span></div>
-      <div class="p-3 bg-purple-100 rounded price">تتر: <span id="usdt">در حال بارگذاری...</span></div>
-      <div class="p-3 bg-pink-100 rounded price">بیت‌کوین: <span id="btc">در حال بارگذاری...</span></div>
-      <div class="p-3 bg-teal-100 rounded price">اتریوم: <span id="eth">در حال بارگذاری...</span></div>
+    <div id="prices" class="grid grid-cols-2 gap-4 text-right">
+      <div class="bg-green-100 p-3 rounded price" data-symbol="gold-miskal">مثقال طلا: <span id="gold">در حال
+          بارگذاری...</span></div>
+      <div class="bg-yellow-100 p-3 rounded price" data-symbol="coin-emami">سکه: <span id="coin">در حال
+          بارگذاری...</span>
+      </div>
+      <div class="bg-blue-100 p-3 rounded price" data-symbol="usd">دلار: <span id="usd">در حال بارگذاری...</span></div>
+      <div class="bg-pink-100 p-3 rounded price" data-symbol="usdt">تتر: <span id="usdt">در حال بارگذاری...</span></div>
+      <div class="bg-purple-100 p-3 rounded price" data-symbol="btc">بیت‌کوین: <span id="btc">در حال بارگذاری...</span>
+      </div>
+      <div class="bg-teal-100 p-3 rounded price" data-symbol="eth">اتریوم: <span id="eth">در حال بارگذاری...</span>
+      </div>
     </div>
 
     <div class="text-center">
@@ -59,9 +61,24 @@
 
     <div class="text-center mt-4">
       <p>تاریخ و زمان به‌روز: <span id="current-time">در حال بارگذاری...</span></p>
-      <br>
-      <p style="color: rgb(209, 209, 209);">Developed by Mehran Mirzaei</p>
+      <br />
+      <p style="color: rgb(180, 180, 180); font-size: 12px;">Developed by Mehran Mirzaei</p>
     </div>
+  </div>
+
+  <!-- تاریخچه -->
+  <div id="history-section" class="max-w-3xl mx-auto mt-10 bg-white rounded-lg shadow-lg p-6 hidden">
+    <h2 class="text-xl font-semibold mb-4 text-center" id="history-title">تاریخچه</h2>
+    <form onsubmit="getHistory(event)" class="flex gap-2 items-center justify-center mb-4">
+      <label for="from">از:</label>
+      <input type="date" id="from" required class="border rounded px-2 py-1" />
+      <label for="to">تا:</label>
+      <input type="date" id="to" required class="border rounded px-2 py-1" />
+      <button class="bg-green-500 text-white px-4 py-1 rounded hover:bg-green-700">نمایش</button>
+    </form>
+
+    <div id="history-table" class="overflow-auto"></div>
+    <canvas id="history-chart" class="w-full max-h-[400px] hidden"></canvas>
   </div>
 
   <script>
@@ -88,9 +105,95 @@
       document.getElementById('current-time').innerText = timeString;
     }
 
+    let selectedSymbol = "";
+
+    document.querySelectorAll("#prices div").forEach((el) => {
+      el.style.cursor = "pointer";
+      el.addEventListener("click", () => {
+        selectedSymbol = el.dataset.symbol;
+        const title = el.textContent.split(":")[0];
+        document.getElementById("history-title").innerText = `تاریخچه ${title}`;
+        document.getElementById("history-section").classList.remove("hidden");
+      });
+    });
+
+    let chartInstance;
+
+    async function getHistory(e) {
+      e.preventDefault();
+      const from = document.getElementById("from").value;
+      const to = document.getElementById("to").value;
+
+      const table = document.getElementById("history-table");
+      const chart = document.getElementById("history-chart");
+      table.innerHTML = "";
+      chart.classList.add("hidden");
+
+      if (!selectedSymbol) return;
+
+      let endpoint;
+      switch (selectedSymbol) {
+        case 'btc':
+        case 'usdt':
+        case 'eth':
+          endpoint = await fetch(`/api/history/crypto/${selectedSymbol}?from_ts=${from}&to_ts=${to}`);
+          break;
+        case 'usd':
+        case 'coin-emami':
+        case 'gold-miskal':
+          endpoint = await fetch(`/api/history/local/${selectedSymbol}?from_date=${from}&to_date=${to}`);
+          break;
+        default:
+      }
+
+      const data = await endpoint.json();
+
+      // if (["usd", "coin-emami", "gold-miskal"].includes(selectedSymbol)) {
+      //   let html = `<table class="w-full text-center border"><thead><tr><th>تاریخ</th><th>قیمت</th><th>بیشترین</th><th>کمترین</th></tr></thead><tbody>`;
+      //   data.forEach(d => {
+      //     const date = new Date(d.time).toLocaleDateString('fa-IR');
+      //     html += `<tr><td>${date}</td><td>${formatNumber(d.price / 10)} تومان</td><td>${formatNumber(d.high / 10)} تومان</td><td>${formatNumber(d.low / 10)} تومان</td></tr>`;
+      //   });
+      //   html += "</tbody></table>";
+      //   table.innerHTML = html;
+      // } else {
+      const labels = data.map((d, i) => new Date(d.time * 1000).toLocaleString('fa-IR'));
+      const prices = data.map((d) => d.price / 10);
+
+      if (chartInstance) chartInstance.destroy();
+
+      chart.classList.remove("hidden");
+      chartInstance = new Chart(chart, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: "قیمت (تومان)",
+            data: prices,
+            borderColor: 'rgba(75,192,192,1)',
+            backgroundColor: 'rgba(75,192,192,1)',
+            tension: 0.5
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            y: {
+              ticks: {
+                callback: function (value) {
+                  return formatNumber(value);
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+    // }
+
     fetchPrices();
-    setInterval(fetchPrices, 30000); // بروزرسانی هر 30 ثانیه
-    setInterval(updateTime, 1000); // بروزرسانی ساعت هر 1 ثانیه
+    setInterval(fetchPrices, 30000);
+    setInterval(updateTime, 1000);
   </script>
 </body>
 
